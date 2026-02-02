@@ -1,3 +1,5 @@
+Repo : https://github.com/Saruthevan/TPdevops.git
+
 L’objectif de ce projet est de mettre en place une CI permettant de préparer une mise en production Kubernetes à partir d’un docker-compose existant.
 Dans ce projet, j’ai mis en place une pipeline CI avec GitHub Actions qui fait les étapes suivantes :
     
