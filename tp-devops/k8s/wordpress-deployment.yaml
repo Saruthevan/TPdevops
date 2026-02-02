@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert -f docker-compose.yaml -o k8s/
+    kompose.version: 1.38.0 (HEAD)
+  labels:
+    io.kompose.service: wordpress
+  name: wordpress
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: wordpress
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose convert -f docker-compose.yaml -o k8s/
+        kompose.version: 1.38.0 (HEAD)
+      labels:
+        io.kompose.service: wordpress
+    spec:
+      containers:
+        - env:
+            - name: WORDPRESS_DB_HOST
+              value: mariadb
+            - name: WORDPRESS_DB_NAME
+              value: wordpress
+            - name: WORDPRESS_DB_PASSWORD_FILE
+              value: /run/secrets/mariadb-password
+            - name: WORDPRESS_DB_USER_FILE
+              value: /run/secrets/mariadb-user
+          image: wordpress:6.4.3-php8.1-apache
+          name: wordpress
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /run/secrets
+              name: mariadb-user
+              subPath: mariadb-user
+            - mountPath: /run/secrets
+              name: mariadb-password
+              subPath: mariadb-password
+      restartPolicy: Always
+      volumes:
+        - name: mariadb-user
+          secret:
+            items:
+              - key: mariadb-user
+                path: mariadb-user
+            secretName: mariadb-user
+        - name: mariadb-password
+          secret:
+            items:
+              - key: mariadb-password
+                path: mariadb-password
+            secretName: mariadb-password

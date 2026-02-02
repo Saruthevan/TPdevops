@@ -1,0 +1,58 @@
+name: wordpress-ci-windows
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  generate:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create secrets files
+        shell: powershell
+        run: |
+          # Création du dossier secrets s'il n'existe pas
+          if (!(Test-Path secrets)) { New-Item -ItemType Directory -Path secrets }
+          "${{ secrets.MARIADB_USER }}" | Out-File -FilePath secrets/mariadb_user.txt -Encoding ascii
+          "${{ secrets.MARIADB_PASSWORD }}" | Out-File -FilePath secrets/mariadb_password.txt -Encoding ascii
+          "${{ secrets.MARIADB_ROOT_PASSWORD }}" | Out-File -FilePath secrets/mariadb_root_password.txt -Encoding ascii
+
+      - name: Install kompose
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/kubernetes/kompose/releases/download/v1.32.0/kompose-windows-amd64.exe" -OutFile "kompose.exe"
+          # Ajout au PATH pour l'utiliser directement
+          $currentDir = Get-Location
+          echo "$currentDir" >> $env:GITHUB_PATH
+
+      - name: Generate Kubernetes manifests
+        shell: powershell
+        run: |
+          # Nettoyage et recréation du dossier k8s visible sur ton image
+          if (Test-Path k8s) { Remove-Item -Recurse -Force k8s }
+          New-Item -ItemType Directory -Path k8s
+          .\kompose.exe convert -f docker-compose.yaml -o k8s/
+
+      - name: Create zip
+        shell: powershell
+        run: |
+          # Création du dossier de rendu
+          New-Item -ItemType Directory -Force -Path SarujanThevanesan
+          Copy-Item "k8s\*.yaml" -Destination "SarujanThevanesan\"
+          # Compression native Windows
+          Compress-Archive -Path SarujanThevanesan -DestinationPath SarujanThevanesanWordpress.zip -Force
+
+      - name: Upload zip to FTP
+        shell: powershell
+        run: |
+          $url = "ftp://${{ secrets.FTP_HOST }}/RenduDevopsKube/SarujanThevanesanWordpress.zip"
+          $user = "${{ secrets.FTP_USER }}"
+          $pass = "${{ secrets.FTP_PASSWORD }}"
+          $webclient = New-Object System.Net.WebClient
+          $webclient.Credentials = New-Object System.Net.NetworkCredential($user, $pass)
+          $file = (Get-Item "SarujanThevanesanWordpress.zip").FullName
+          $webclient.UploadFile($url, "STOR", $file)
